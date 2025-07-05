@@ -25,23 +25,21 @@ body {
 
 
 .header {
-  background-color: white;
-  color: #038ba4;
-  padding: 15px 20px;
-  font-weight: bold;
-  border-left: 4px solid #038ba4;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  font-size: 1.1rem;
+  background-color: #37a9be;
+    color: white;
+    padding: 0.5rem 1rem;
+    margin: 1rem 0 2rem 0;
+    border-radius: 4px 4px 0 0;
+    font-weight: 600;
 }
 
 
 .card {
   background-color: #fff;
-  border: 1px solid #ccc;
-  border-top: none;
+  border: 1px solid #ddd;
   padding: 20px;
-  border-radius: 0 0 5px 5px;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 
@@ -121,12 +119,23 @@ body {
 
 
 .badge {
-  display: inline-block;
+  /* display: inline-block;
   background-color: #eee;
   padding: 10px 10px;
   border-radius: 4px;
   margin: 2px 0;
-  font-size: 0.85em;
+  font-size: 0.85em; */
+  display: inline-flex;
+    padding: 6px 11px;
+    width: fit-content;
+    max-height: fit-content;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background-color: #e3f2fd; /* Light blue background for default state */
+    color: #1976d2; /* Blue text color */
 }
 
 
@@ -140,18 +149,21 @@ body {
 .badge.status-pending {
   background-color: #fef3c7;
   color: #92400e;
+  border: 1px solid #92400e;
 }
 
 
 .badge.status-prepared {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #2e7d32;
 }
 
 
 .badge.status-delivered {
   background-color: #e0e7ff;
   color: #3730a3;
+  border: 1px solid #3730a3;
 }
 
 

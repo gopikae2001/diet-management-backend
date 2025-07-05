@@ -41,7 +41,7 @@ const FoodItemForm: React.FC<FoodItemProps> = ({ sidebarCollapsed = false, toggl
 
     useEffect(() => {
         if (isEditMode && id) {
-            const item = getFoodItem(parseInt(id));
+            const item = getFoodItem(id);
             if (item) {
                 const { id: _, ...rest } = item;
                 setFormData(rest);
@@ -109,7 +109,7 @@ const FoodItemForm: React.FC<FoodItemProps> = ({ sidebarCollapsed = false, toggl
         
         try {
             if (isEditMode && id) {
-                editFoodItem(parseInt(id), formData);
+                editFoodItem(id, formData);
                 toast.info('Food item updated successfully!');
             } else {
                 addFoodItem(formData);

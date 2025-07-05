@@ -1,8 +1,9 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import type { ReactNode } from 'react';
+import { foodItemsApi } from '../services/api';
 
 export interface FoodItem {
-  id: number;
+  id: string;
   name: string;
   foodType: string;
   category: string;
@@ -18,77 +19,81 @@ export interface FoodItem {
 
 interface FoodContextType {
   foodItems: FoodItem[];
-  addFoodItem: (item: Omit<FoodItem, 'id'>) => void;
-  editFoodItem: (id: number, updatedItem: Omit<FoodItem, 'id'>) => void;
-  deleteFoodItem: (id: number) => void;
-  getFoodItem: (id: number) => FoodItem | undefined;
+  addFoodItem: (item: Omit<FoodItem, 'id'>) => Promise<void>;
+  editFoodItem: (id: string, updatedItem: Omit<FoodItem, 'id'>) => Promise<void>;
+  deleteFoodItem: (id: string) => Promise<void>;
+  getFoodItem: (id: string) => FoodItem | undefined;
+  refreshFoodItems: () => Promise<void>;
+  isLoading: boolean;
 }
 
-const FOOD_ITEMS_KEY = 'diet_planner_food_items';
 const FoodContext = createContext<FoodContextType | undefined>(undefined);
-
-const getStoredFoodItems = (): FoodItem[] => {
-  if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem(FOOD_ITEMS_KEY);
-  return stored ? JSON.parse(stored) : [];
-};
 
 export const FoodProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load items from localStorage on initial render
-  useEffect(() => {
-    const storedItems = getStoredFoodItems();
-    if (storedItems.length > 0) {
-      setFoodItems(storedItems);
+  const refreshFoodItems = async () => {
+    try {
+      setIsLoading(true);
+      const items = await foodItemsApi.getAll();
+      setFoodItems(items);
+    } catch (error) {
+      console.error('Failed to load food items:', error);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Load items from API on initial render
+  useEffect(() => {
+    refreshFoodItems();
   }, []);
 
-  // Save to localStorage whenever foodItems change
-  useEffect(() => {
-    if (foodItems.length > 0) {
-      localStorage.setItem(FOOD_ITEMS_KEY, JSON.stringify(foodItems));
+  const addFoodItem = async (item: Omit<FoodItem, 'id'>) => {
+    try {
+      const quantityNum = Number(item.quantity);
+      const priceNum = Number(item.price);
+      const pricePerUnit = (!isNaN(quantityNum) && quantityNum > 0 && !isNaN(priceNum)) ? (priceNum / quantityNum).toFixed(2) : '';
+      
+      await foodItemsApi.create({ ...item, pricePerUnit });
+      await refreshFoodItems();
+    } catch (error) {
+      console.error('Failed to add food item:', error);
+      throw error;
     }
-  }, [foodItems]);
-
-  const addFoodItem = (item: Omit<FoodItem, 'id'>) => {
-    const quantityNum = Number(item.quantity);
-    const priceNum = Number(item.price);
-    const pricePerUnit = (!isNaN(quantityNum) && quantityNum > 0 && !isNaN(priceNum)) ? (priceNum / quantityNum).toFixed(2) : '';
-    const newItem: FoodItem = {
-      id: foodItems.length > 0 ? Math.max(...foodItems.map(i => i.id)) + 1 : 1,
-      ...item,
-      pricePerUnit,
-    };
-    
-    const updatedItems = [...foodItems, newItem];
-    setFoodItems(updatedItems);
-    localStorage.setItem(FOOD_ITEMS_KEY, JSON.stringify(updatedItems));
   };
 
-  const editFoodItem = (id: number, updatedItem: Omit<FoodItem, 'id'>) => {
-    const quantityNum = Number(updatedItem.quantity);
-    const priceNum = Number(updatedItem.price);
-    const pricePerUnit = (!isNaN(quantityNum) && quantityNum > 0 && !isNaN(priceNum)) ? (priceNum / quantityNum).toFixed(2) : '';
-    const updatedItems = foodItems.map(item => 
-      item.id === id ? { ...updatedItem, id, pricePerUnit } : item
-    );
-    setFoodItems(updatedItems);
-    localStorage.setItem(FOOD_ITEMS_KEY, JSON.stringify(updatedItems));
+  const editFoodItem = async (id: string, updatedItem: Omit<FoodItem, 'id'>) => {
+    try {
+      const quantityNum = Number(updatedItem.quantity);
+      const priceNum = Number(updatedItem.price);
+      const pricePerUnit = (!isNaN(quantityNum) && quantityNum > 0 && !isNaN(priceNum)) ? (priceNum / quantityNum).toFixed(2) : '';
+      
+      await foodItemsApi.update(id, { ...updatedItem, pricePerUnit });
+      await refreshFoodItems();
+    } catch (error) {
+      console.error('Failed to edit food item:', error);
+      throw error;
+    }
   };
 
-  const getFoodItem = (id: number) => {
+  const getFoodItem = (id: string) => {
     return foodItems.find(item => item.id === id);
   };
 
-  const deleteFoodItem = (id: number) => {
-    const updatedItems = foodItems.filter(item => item.id !== id);
-    setFoodItems(updatedItems);
-    localStorage.setItem(FOOD_ITEMS_KEY, JSON.stringify(updatedItems));
+  const deleteFoodItem = async (id: string) => {
+    try {
+      await foodItemsApi.delete(id);
+      await refreshFoodItems();
+    } catch (error) {
+      console.error('Failed to delete food item:', error);
+      throw error;
+    }
   };
 
   return (
-    <FoodContext.Provider value={{ foodItems, addFoodItem, editFoodItem, deleteFoodItem, getFoodItem }}>
+    <FoodContext.Provider value={{ foodItems, addFoodItem, editFoodItem, deleteFoodItem, getFoodItem, refreshFoodItems, isLoading }}>
       {children}
     </FoodContext.Provider>
   );

@@ -1,69 +1,110 @@
-# React + TypeScript + Vite
+# Diet Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A comprehensive diet management application built with React, TypeScript, and Vite. The system provides interfaces for managing diet orders, packages, food items, and patient requests.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Diet Order Management**: Create and manage diet orders for patients
+- **Diet Package Management**: Design and maintain diet packages with meal plans
+- **Food Item Management**: Manage individual food items with nutritional information
+- **Diet Request Processing**: Handle patient diet requests and approvals
+- **Canteen Interface**: Manage meal preparation and delivery
+- **Patient History**: Track patient diet history and orders
 
-## Expanding the ESLint configuration
+## Technology Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Frontend**: React 19 with TypeScript
+- **Build Tool**: Vite
+- **Backend**: JSON Server (for development)
+- **Styling**: CSS modules and custom styles
+- **UI Components**: Ant Design and custom components
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Quick Start
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+### Prerequisites
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Node.js (v18 or higher)
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd diet-management
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+2. Install dependencies:
+```bash
+npm install
 ```
+
+3. Start the JSON server (backend):
+```bash
+npm run server
+```
+
+4. In a separate terminal, start the development server:
+```bash
+npm run dev
+```
+
+5. Open your browser and navigate to `http://localhost:5173`
+
+## Project Structure
+
+```
+diet-management/
+├── src/
+│   ├── components/          # Reusable UI components
+│   ├── pages/              # Main application pages
+│   ├── context/            # React context providers
+│   ├── services/           # API service layer
+│   └── styles/             # CSS stylesheets
+├── db.json                 # JSON database file
+├── package.json            # Project dependencies
+└── README.md              # This file
+```
+
+## API Documentation
+
+The application uses a JSON server backend with the following endpoints:
+
+- **Diet Orders**: `/dietOrders`
+- **Diet Packages**: `/dietPackages`
+- **Food Items**: `/foodItems`
+- **Diet Requests**: `/dietRequests`
+- **Canteen Orders**: `/canteenOrders`
+- **Custom Plans**: `/customPlans`
+
+For detailed API documentation, see [API_SETUP.md](./API_SETUP.md).
+
+## Development
+
+### Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run server` - Start JSON server backend
+- `npm run lint` - Run ESLint
+- `npm run preview` - Preview production build
+
+### Data Storage
+
+The application uses `db.json` as the primary data store. This file is automatically managed by the JSON server and persists data across sessions.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License.
+
+## Support
+
+For issues and questions, please refer to the [API_SETUP.md](./API_SETUP.md) file for detailed setup instructions and troubleshooting.

@@ -11,45 +11,11 @@ import Searchbar from '../components/Searchbar';
 import Table from '../components/Table';
 import EditButton from '../components/EditButton';
 import DeleteButton from '../components/DeleteButton';
+import { dietPackagesApi } from '../services/api';
+import type { DietPackage } from '../services/api';
 
 
-interface DietPackage {
-  id: string;
-  name: string;
-  type: string;
-  totalRate: number;
-  totalNutrition: {
-    calories: number;
-    protein: number;
-    carbohydrates: number;
-    fat: number;
-  };
-  breakfast?: Array<{
-    foodItemName: string;
-    quantity: number;
-    unit: string;
-  }>;
-  brunch?: Array<{
-    foodItemName: string;
-    quantity: number;
-    unit: string;
-  }>;
-  lunch?: Array<{
-    foodItemName: string;
-    quantity: number;
-    unit: string;
-  }>;
-  evening?: Array<{
-    foodItemName: string;
-    quantity: number;
-    unit: string;
-  }>;
-  dinner?: Array<{
-    foodItemName: string;
-    quantity: number;
-    unit: string;
-  }>;
-}
+
 
 interface DietPackageListProps {
   sidebarCollapsed: boolean;
@@ -59,18 +25,24 @@ interface DietPackageListProps {
 const DietPackageList: React.FC<DietPackageListProps> = ({ sidebarCollapsed, toggleSidebar }) => {
   const [dietPackages, setDietPackages] = useState<DietPackage[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Load diet packages from localStorage
+  // Load diet packages from API
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('dietPackages');
-      if (saved) {
-        setDietPackages(JSON.parse(saved));
+    const loadPackages = async () => {
+      try {
+        setIsLoading(true);
+        const packages = await dietPackagesApi.getAll();
+        setDietPackages(packages);
+      } catch (error) {
+        console.error('Failed to load diet packages:', error);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to load diet packages:', error);
-    }
+    };
+
+    loadPackages();
   }, []);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,30 +55,25 @@ const DietPackageList: React.FC<DietPackageListProps> = ({ sidebarCollapsed, tog
     navigate(`/dietpackage/${pkg.id}`, { state: { packageData: pkg } });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this package?')) {
-      // Create a new array without the deleted item
-      const updatedPackages = dietPackages.filter(pkg => pkg.id !== id);
-      // Update localStorage
-      localStorage.setItem('dietPackages', JSON.stringify(updatedPackages));
-      // Update state
-      setDietPackages(updatedPackages);
-      // Show success message (only once)
-      toast.error('Diet package deleted successfully!');
-      // No navigation after delete
-      // Force a re-render by toggling the search term
-      setSearchTerm(prev => prev + ' ');
-      setTimeout(() => setSearchTerm(prev => prev.trimEnd()), 90);
+      try {
+        await dietPackagesApi.delete(id);
+        const updatedPackages = await dietPackagesApi.getAll();
+        setDietPackages(updatedPackages);
+        toast.error('Diet package deleted successfully!');
+      } catch (error) {
+        console.error('Failed to delete diet package:', error);
+        toast.error('Failed to delete diet package. Please try again.');
+      }
     }
   };
 
-  const formatMealItems = (items: Array<{foodItemName: string, quantity: number, unit: string}> = []) => {
+  const formatMealItems = (items: any[] = []) => {
     if (!items || items.length === 0) {
       return 'No items added';
     }
-    return <span style={{ fontWeight: 'bold' }}>
-      {items.map(item => `${item.foodItemName} - ${item.quantity} ${item.unit}`).join(', ')}
-    </span>;
+    return items.map(item => `${item.foodItemName || 'Unknown'} - ${item.quantity || 0} ${item.unit || ''}`).join(', ');
   };
 
   // Filter the diet packages based on search term
@@ -174,17 +141,22 @@ const DietPackageList: React.FC<DietPackageListProps> = ({ sidebarCollapsed, tog
     {
       key: 'actions',
       header: 'Actions',
-      render: (_: any, row: any) => (
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <a onClick={(e: React.MouseEvent) => handleEdit(row as DietPackage)(e)}>
-            <EditButton onClick={() => navigate(`/dietpackage/${row.id}`)}/></a>
-          <a onClick={(e: React.MouseEvent) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleDelete(row.id);
-          }}><DeleteButton /></a>
-        </div>
-      )
+      render: (_: any, row: any) => {
+        return (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <a onClick={(e: React.MouseEvent) => handleEdit(row as DietPackage)(e)}>
+              <EditButton onClick={() => navigate(`/dietpackage/${row.id}`)}/>
+            </a>
+            <a onClick={(e: React.MouseEvent) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleDelete(row.id);
+            }}>
+              <DeleteButton />
+            </a>
+          </div>
+        );
+      }
     }
   ];
 
@@ -195,24 +167,31 @@ const DietPackageList: React.FC<DietPackageListProps> = ({ sidebarCollapsed, tog
         <SectionHeading 
           title="Diet Package List" 
           subtitle="View and manage all diet packages" 
-
         />
         
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:"center" ,marginBottom: '20px' }}>
-            <ButtonWithGradient 
-              text="+ Add New Diet Package" 
-              onClick={() => navigate('/dietpackage')} 
-            />
-          <Searchbar value={searchTerm} onChange={handleSearchChange} placeholder="Search diet packages..." />
-        </div>
-        
-        <div style={{ marginTop: '20px' }}>
-          <Table 
-            columns={columns} 
-            data={tableData}
-            key={`table-${tableData.length}`} // Force re-render when data changes
-          />
-        </div>
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            Loading diet packages...
+          </div>
+        ) : (
+          <>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:"center" ,marginBottom: '20px' }}>
+              <ButtonWithGradient 
+                text="+ Add New Diet Package" 
+                onClick={() => navigate('/dietpackage')} 
+              />
+              <Searchbar value={searchTerm} onChange={handleSearchChange} placeholder="Search diet packages..." />
+            </div>
+            
+            <div style={{ marginTop: '20px' }}>
+              <Table 
+                columns={columns} 
+                data={tableData}
+                key={`table-${tableData.length}`} // Force re-render when data changes
+              />
+            </div>
+          </>
+        )}
       </PageContainer>
       <Footer/>
     </>

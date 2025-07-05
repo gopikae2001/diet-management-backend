@@ -12,11 +12,13 @@ import type { FoodItem } from "../context/FoodContext";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
+import { dietPackagesApi } from '../services/api';
+import type { DietPackage } from '../services/api';
 // import { foodItemApi } from "../api/foodItemApi";
 // import type { FoodItem } from "../types/foodItem";
 
 interface MealItem {
-  foodItemId: number;
+  foodItemId: string;
   foodItemName: string;
   quantity: number;
   unit: string;
@@ -27,23 +29,7 @@ interface DietPackageFormProps {
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
 }
-interface DietPackage {
-  id: string;
-  name: string;
-  type: string;
-  breakfast: MealItem[];
-  brunch: MealItem[];
-  lunch: MealItem[];
-  dinner: MealItem[];
-  evening: MealItem[];
-  totalRate: number;
-  totalNutrition: {
-    calories: number;
-    protein: number;
-    carbohydrates: number;
-    fat: number;
-  };
-}
+
 
 const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, toggleSidebar }) => {
   const { foodItems } = useFood();
@@ -51,17 +37,26 @@ const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, tog
   const params = useParams();
   const navigate = useNavigate();
   
-  // Load saved packages from localStorage on initial render
   const [searchTerm, setSearchTerm] = useState('');
-  const [dietPackages, setDietPackages] = useState<DietPackage[]>(() => {
-    try {
-      const saved = localStorage.getItem('dietPackages');
-      return saved ? JSON.parse(saved) : [];
-    } catch (error) {
-      console.error('Failed to load diet packages from localStorage:', error);
-      return [];
-    }
-  });
+  const [dietPackages, setDietPackages] = useState<DietPackage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load packages from API
+  useEffect(() => {
+    const loadPackages = async () => {
+      try {
+        setIsLoading(true);
+        const packages = await dietPackagesApi.getAll();
+        setDietPackages(packages);
+      } catch (error) {
+        console.error('Failed to load diet packages:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPackages();
+  }, []);
 
   const filteredDietPackages = dietPackages.filter((pkg, index) => {
     if (!searchTerm.trim()) return true;
@@ -76,15 +71,6 @@ const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, tog
     );
   });
 
-  // Save packages to localStorage whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem('dietPackages', JSON.stringify(dietPackages));
-    } catch (error) {
-      console.error('Failed to save diet packages to localStorage:', error);
-    }
-  }, [dietPackages]);
-
   const [formData, setFormData] = useState({ name: "", type: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [meals, setMeals] = useState({
@@ -96,17 +82,13 @@ const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, tog
   });
 
   useEffect(() => {
-    // If editing, pre-fill form with package data from navigation state or localStorage
+    // If editing, pre-fill form with package data from navigation state or API
     const editId = params.id;
     if (editId) {
       let pkg = location.state?.packageData;
       if (!pkg) {
-        // fallback: load from localStorage
-        const saved = localStorage.getItem('dietPackages');
-        if (saved) {
-          const all = JSON.parse(saved);
-          pkg = all.find((p: any) => p.id === editId);
-        }
+        // fallback: load from API
+        pkg = dietPackages.find((p: any) => p.id === editId);
       }
       if (pkg) {
         setFormData({ name: pkg.name, type: pkg.type });
@@ -120,7 +102,7 @@ const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, tog
         });
       }
     }
-  }, [location.state, params.id]);
+  }, [location.state, params.id, dietPackages]);
 
   const calculateTotals = () => {
     let totalRate = 0;
@@ -143,7 +125,7 @@ const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, tog
   };
 
   const addMealItem = (mealType: string) => {
-    const newItem: MealItem = { foodItemId: 0, foodItemName: "", quantity: 1, unit: "", time: '', period: 'AM' };
+    const newItem: MealItem = { foodItemId: "", foodItemName: "", quantity: 1, unit: "", time: '', period: 'AM' };
 
     setMeals((prev) => ({
       ...prev,
@@ -155,9 +137,7 @@ const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, tog
     setMeals((prev) => {
       const updatedMeals = { ...prev };
       const mealArray = [...updatedMeals[mealType as keyof typeof updatedMeals]] as MealItem[];
-      if (field === "foodItemId") {
-        value = Number(value);
-      }
+      
       mealArray[index] = { ...mealArray[index], [field]: value };
 
       if (field === "foodItemId") {
@@ -183,11 +163,10 @@ const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, tog
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const { totalRate, totalNutrition } = calculateTotals();
-    const newPackage: DietPackage = {
-      id: editingId || Date.now().toString(),
+    const packageData: Omit<DietPackage, 'id'> = {
       name: formData.name,
       type: formData.type,
       breakfast: meals.breakfast,
@@ -198,6 +177,7 @@ const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, tog
       totalRate,
       totalNutrition,
     };
+    
     // Check for required fields
     const requiredFields = [
       'name', 'type'
@@ -207,31 +187,32 @@ const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, tog
       toast.error(`Please fill in all required fields: ${missingFields.join(', ')}`);
       return;
     }
-    // Show toast before state update
-    if (editingId) {
-      toast.info('Diet package updated!');
-    } else {
-      toast.success('Diet package created successfully!');
-    }
 
-    // Update state and storage
-    setDietPackages(prev => {
-      const updated = editingId 
-        ? prev.map(pkg => pkg.id === editingId ? newPackage : pkg)
-        : [...prev, newPackage];
+    try {
+      if (editingId) {
+        await dietPackagesApi.update(editingId, packageData);
+        toast.info('Diet package updated!');
+      } else {
+        await dietPackagesApi.create(packageData);
+        toast.success('Diet package created successfully!');
+      }
+
+      // Refresh packages from API
+      const updatedPackages = await dietPackagesApi.getAll();
+      setDietPackages(updatedPackages);
+
+      // Handle navigation after update/create
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        navigate('/dietpackagelist');
+      }, 100);
       
-      localStorage.setItem('dietPackages', JSON.stringify(updated));
-      return updated;
-    });
-
-    // Handle navigation after update/create
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      navigate('/dietpackagelist');
-    }, 100);
-    
-    if (!editingId) {
-      resetForm();
+      if (!editingId) {
+        resetForm();
+      }
+    } catch (error) {
+      console.error('Failed to save diet package:', error);
+      toast.error('Failed to save diet package. Please try again.');
     }
   };
 
@@ -255,15 +236,17 @@ const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, tog
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this package?')) {
-      setDietPackages((prev) => {
-        const updated = prev.filter((pkg) => pkg.id !== id);
-        // Update localStorage immediately
-        localStorage.setItem('dietPackages', JSON.stringify(updated));
+      try {
+        await dietPackagesApi.delete(id);
+        const updatedPackages = await dietPackagesApi.getAll();
+        setDietPackages(updatedPackages);
         toast.error('Diet package deleted successfully!');
-        return updated;
-      });
+      } catch (error) {
+        console.error('Failed to delete diet package:', error);
+        toast.error('Failed to delete diet package. Please try again.');
+      }
     }
   };
 
@@ -362,11 +345,11 @@ const DietPackageForm: React.FC<DietPackageFormProps> = ({ sidebarCollapsed, tog
                       label="Time"
                       value={item.time || ''}
                       onChange={e => updateMealItem(mealType, index, 'time', e.target.value)}
-                      onFocus={(e: React.FocusEvent<HTMLInputElement>) => {
-                        e.preventDefault();
-                      }}
-                      onClick={(e: React.MouseEvent<HTMLInputElement>) => {
-                        e.preventDefault();
+                      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                        // Allow only arrow keys, tab, and backspace
+                        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Backspace'].includes(e.key)) {
+                          e.preventDefault();
+                        }
                       }}
                     />
                   </div>

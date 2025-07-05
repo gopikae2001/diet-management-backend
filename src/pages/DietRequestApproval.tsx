@@ -12,21 +12,11 @@ import ApproveButton from '../components/AcceptButton';
 import RejectButton from '../components/RejectButton';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye } from '@fortawesome/free-solid-svg-icons';
+import { dietRequestsApi } from '../services/api';
+import type { DietRequest } from '../services/api';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import '../styles/DietRequestApproval.css'
-
-interface DietRequest {
-  id: string;
-  patientId: string;
-  patientName: string;
-  age: string;
-  contactNumber: string;
-  bed: string;
-  ward: string;
-  floor: string;
-  doctor: string;
-  doctorNotes: string;
-  status: 'Pending' | 'Diet Order Placed' | 'Rejected';
-}
 
 interface DietRequestApprovalProps {
     sidebarCollapsed?: boolean;
@@ -37,44 +27,66 @@ const DietRequestApproval: React.FC<DietRequestApprovalProps> = ({ sidebarCollap
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [requests, setRequests] = useState<DietRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Load diet requests from API
   useEffect(() => {
-    const saved = localStorage.getItem('dietRequests');
-    if (saved) {
-      setRequests(JSON.parse(saved));
-    }
+    const loadRequests = async () => {
+      try {
+        setIsLoading(true);
+        const data = await dietRequestsApi.getAll();
+        setRequests(data);
+      } catch (error) {
+        console.error('Failed to load diet requests:', error);
+        toast.error('Failed to load diet requests');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadRequests();
   }, []);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
   };
 
-  const handleApprove = (id: string) => {
-    setRequests(prev => {
-      const updated = prev.map(r =>
-        r.id === id ? { ...r, status: 'Diet Order Placed' as const } : r
-      );
-      localStorage.setItem('dietRequests', JSON.stringify(updated));
-      return updated;
-    });
+  const handleApprove = async (id: string) => {
+    try {
+      await dietRequestsApi.update(id, { status: 'Diet Order Placed' });
+      const updatedRequests = await dietRequestsApi.getAll();
+      setRequests(updatedRequests);
+      toast.success('Diet request approved successfully!');
+    } catch (error) {
+      console.error('Failed to approve diet request:', error);
+      toast.error('Failed to approve diet request');
+    }
   };
 
-  const handleReject = (id: string) => {
-    setRequests(prev => {
-      const updated = prev.map(r =>
-        r.id === id ? { ...r, status: 'Rejected' as const } : r
-      );
-      localStorage.setItem('dietRequests', JSON.stringify(updated));
-      return updated;
-    });
+  const handleReject = async (id: string) => {
+    try {
+      await dietRequestsApi.update(id, { status: 'Rejected' });
+      const updatedRequests = await dietRequestsApi.getAll();
+      setRequests(updatedRequests);
+      toast.error('Diet request rejected successfully!');
+    } catch (error) {
+      console.error('Failed to reject diet request:', error);
+      toast.error('Failed to reject diet request');
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setRequests(prev => {
-      const updated = prev.filter(r => r.id !== id);
-      localStorage.setItem('dietRequests', JSON.stringify(updated));
-      return updated;
-    });
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this request?')) {
+      try {
+        await dietRequestsApi.delete(id);
+        const updatedRequests = await dietRequestsApi.getAll();
+        setRequests(updatedRequests);
+        toast.error('Diet request deleted successfully!');
+      } catch (error) {
+        console.error('Failed to delete diet request:', error);
+        toast.error('Failed to delete diet request');
+      }
+    }
   };
 
   const columns = [
@@ -180,12 +192,18 @@ const DietRequestApproval: React.FC<DietRequestApprovalProps> = ({ sidebarCollap
           placeholder="Search diet requests..."
         />
       </div>
-      <div style={{ marginTop: '20px' }}>
-        <Table 
-          columns={columns} 
-          data={filteredData.map((item, index) => ({ ...item, serial: index + 1 }))} 
-        />
-      </div>
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          Loading diet requests...
+        </div>
+      ) : (
+        <div style={{ marginTop: '20px' }}>
+          <Table 
+            columns={columns} 
+            data={filteredData.map((item, index) => ({ ...item, serial: index + 1 }))} 
+          />
+        </div>
+      )}
     </PageContainer>
     <Footer/>
     </>

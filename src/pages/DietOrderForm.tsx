@@ -12,24 +12,12 @@ import Searchbar from "../components/Searchbar";
 import FormInputType from "../components/Inputtype";
 import FormDateInput from "../components/Date";
 import { useNavigate } from 'react-router-dom';
+import { Form, useLocation } from 'react-router-dom';
+import { Flex } from "antd";
+import { dietOrdersApi, dietPackagesApi } from '../services/api';
+import type { DietOrder, DietPackage } from '../services/api';
 
-interface DietOrder {
-  id: string;
-  patientName: string;
-  patientId: string;
-  age: string;
-  contactNumber: string; // Added
-  bed: string;
-  ward: string;
-  dietPackage: string;
-  packageName?: string; // Added for displaying the package name
-  packageRate?: number; // Added for storing the package rate
-  startDate: string;
-  endDate: string;
-  doctorNotes: string;
-  status: "active" | "paused" | "stopped";
-  approvalStatus: "pending" | "approved" | "rejected";
-}
+
 interface DietOrderFormProps {
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
@@ -42,80 +30,45 @@ interface MealItem {
   unit: string;
 }
 
-interface DietPackage {
-  id: string;
-  name: string;
-  type: string;
-  breakfast: MealItem[];
-  brunch: MealItem[];
-  lunch: MealItem[];
-  dinner: MealItem[];
-  evening: MealItem[];
-  totalRate: number;
-  totalNutrition: {
-    calories: number;
-    protein: number;
-    carbohydrates: number;
-    fat: number;
-  };
-}
-
-// Function to load diet packages from localStorage
-const loadDietPackages = (): DietPackage[] => {
+// Function to load diet packages from API
+const loadDietPackages = async (): Promise<DietPackage[]> => {
   try {
-    const saved = localStorage.getItem('dietPackages');
-    return saved ? JSON.parse(saved) : [];
+    return await dietPackagesApi.getAll();
   } catch (error) {
     console.error('Failed to load diet packages:', error);
     return [];
   }
 };
 
-import { Form, useLocation } from 'react-router-dom';
-import { Flex } from "antd";
+
 
 const DietOrderForm: React.FC<DietOrderFormProps> = ({ sidebarCollapsed, toggleSidebar }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  // Load saved orders and diet packages from localStorage on initial render
-  const [dietPackages, setDietPackages] = useState<DietPackage[]>(() => loadDietPackages());
+  const [dietPackages, setDietPackages] = useState<DietPackage[]>([]);
+  const [orders, setOrders] = useState<DietOrder[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // const [notification, setNotification] = useState<{message: string; type: 'success' | 'error' | ''}>({message: '', type: ''});
-  const [orders, setOrders] = useState<DietOrder[]>(() => {
-    try {
-      const saved = localStorage.getItem('dietOrders');
-      return saved ? JSON.parse(saved) : [];
-    } catch (error) {
-      console.error('Failed to load diet orders from localStorage:', error);
-      return [];
-    }
-  });
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Save orders to localStorage whenever they change
+  // Load data from API on component mount
   useEffect(() => {
-    try {
-      localStorage.setItem('dietOrders', JSON.stringify(orders));
-    } catch (error) {
-      console.error('Failed to save diet orders to localStorage:', error);
-    }
-  }, [orders]);
-
-  // Listen for changes to diet packages in localStorage
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setDietPackages(loadDietPackages());
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const [packagesData, ordersData] = await Promise.all([
+          dietPackagesApi.getAll(),
+          dietOrdersApi.getAll()
+        ]);
+        setDietPackages(packagesData);
+        setOrders(ordersData);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    // Listen for custom event when packages are updated
-    window.addEventListener('dietPackagesUpdated', handleStorageChange);
-    
-    // Also check for changes periodically (in case the event isn't caught)
-    const interval = setInterval(handleStorageChange, 2000);
-    
-    return () => {
-      window.removeEventListener('dietPackagesUpdated', handleStorageChange);
-      clearInterval(interval);
-    };
+    loadData();
   }, []);
   interface FormState {
     patientName: string;
@@ -167,23 +120,7 @@ const DietOrderForm: React.FC<DietOrderFormProps> = ({ sidebarCollapsed, toggleS
     }
   }, [form.dietPackage, dietPackages]);
 
-  // Listen for changes to diet packages in localStorage
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setDietPackages(loadDietPackages());
-    };
 
-    // Listen for custom event when packages are updated
-    window.addEventListener('dietPackagesUpdated', handleStorageChange);
-    
-    // Also check for changes periodically (in case the event isn't caught)
-    const interval = setInterval(handleStorageChange, 2000);
-    
-    return () => {
-      window.removeEventListener('dietPackagesUpdated', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -220,15 +157,16 @@ const DietOrderForm: React.FC<DietOrderFormProps> = ({ sidebarCollapsed, toggleS
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this order?')) {
-      setOrders(prev => {
-        const updated = prev.filter(order => order.id !== id);
-        if (updated.length < prev.length) {
-          // showNotification('Order deleted successfully!', 'success');
-        }
-        return updated;
-      });
+      try {
+        await dietOrdersApi.delete(id);
+        const updatedOrders = await dietOrdersApi.getAll();
+        setOrders(updatedOrders);
+      } catch (error) {
+        console.error('Failed to delete order:', error);
+        setInfoMessage('Failed to delete order. Please try again.');
+      }
     }
   };
 
@@ -274,13 +212,17 @@ const DietOrderForm: React.FC<DietOrderFormProps> = ({ sidebarCollapsed, toggleS
   // Notification state for showing message if user clicks No
   const [infoMessage, setInfoMessage] = useState<string>("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingId) {
       // Only for creating new order
       const confirmCollect = window.confirm('Are you collecting the amount from patient?');
       if (!confirmCollect) {
         setInfoMessage('Please collect amount from patient.');
+        // Use setTimeout to ensure the scroll happens after the state update
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 10);
         return;
       } else {
         setInfoMessage("");
@@ -288,27 +230,38 @@ const DietOrderForm: React.FC<DietOrderFormProps> = ({ sidebarCollapsed, toggleS
     }
     if (form.contactNumber.length !== 10) {
       setInfoMessage('Contact number must be 10 digits.');
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
       return;
     }
-    const selectedPackage = dietPackages.find(pkg => pkg.id === form.dietPackage);
-    const newOrder: DietOrder = {
-      id: editingId || Date.now().toString(),
-      ...form,
-      packageName: selectedPackage ? `${selectedPackage.name}${selectedPackage.type ? ` (${selectedPackage.type})` : ''}` : undefined,
-      packageRate: selectedPackage?.totalRate,
-    };
-    setOrders(prev => {
+    
+    try {
+      const selectedPackage = dietPackages.find(pkg => pkg.id === form.dietPackage);
+      const orderData: Omit<DietOrder, 'id'> = {
+        ...form,
+        floor: form.floor || '',
+        packageRate: selectedPackage?.totalRate?.toString() || '',
+      };
+
       if (editingId) {
-        const updated = prev.map(order => order.id === editingId ? newOrder : order);
-        return updated;
+        await dietOrdersApi.update(editingId, orderData);
       } else {
-        return [...prev, newOrder];
+        await dietOrdersApi.create(orderData);
       }
-    });
-    setEditingId(null);
-    resetForm();
-    if (!editingId) {
-      navigate('/dietician');
+
+      // Refresh orders from API
+      const updatedOrders = await dietOrdersApi.getAll();
+      setOrders(updatedOrders);
+      
+      setEditingId(null);
+      resetForm();
+      if (!editingId) {
+        navigate('/dietician');
+      }
+    } catch (error) {
+      console.error('Failed to save order:', error);
+      setInfoMessage('Failed to save order. Please try again.');
     }
   };
 

@@ -8,20 +8,10 @@ import { useNavigate } from 'react-router-dom';
 import FormInputs from '../components/Input';
 import ButtonWithGradient from '../components/button';
 import AddressInput from '../components/Addressinput';
-
-interface DietRequest {
-    id: string;
-    patientId: string;
-    patientName: string;
-    age: string;
-    contactNumber: string;
-    bed: string;
-    ward: string;
-    floor: string;
-    doctor: string;
-    doctorNotes: string;
-    status: 'Pending' | 'Diet Order Placed' | 'Rejected';
-}
+import { dietRequestsApi } from '../services/api';
+import type { DietRequest } from '../services/api';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface DietRequestManagementProps {
     sidebarCollapsed: boolean;
@@ -51,71 +41,51 @@ const DietRequestManagement: React.FC<DietRequestManagementProps> = ({ sidebarCo
     const [patientNameError, setPatientNameError] = useState('');
 
     useEffect(() => {
-        // Fetch diet requests from localStorage or mock data
-        const saved = localStorage.getItem('dietRequests');
-        if (saved) {
-            setRequests(JSON.parse(saved));
-        } else {
-            // Mock data for demo
-            const mock: DietRequest[] = [
-                {
-                    id: '1',
-                    patientId: 'P001',
-                    patientName: 'John Doe',
-                    age: '45',
-                    contactNumber: '1234567890',
-                    bed: '12A',
-                    ward: 'Cardiology',
-                    floor: '2',
-                    doctor: 'Dr. Smith',
-                    doctorNotes: 'Patient has diabetes. Monitor sugar levels.',
-                    status: 'Pending',
-                },
-                {
-                    id: '2',
-                    patientId: 'P002',
-                    patientName: 'Jane Smith',
-                    age: '60',
-                    contactNumber: '1234567890',
-                    bed: '8B',
-                    ward: 'Neurology',
-                    floor: '3',
-                    doctor: 'Dr. Brown',
-                    doctorNotes: 'Patient is vegetarian. No dietary restrictions.',
-                    status: 'Diet Order Placed',
-                },
-            ];
-            setRequests(mock);
-            localStorage.setItem('dietRequests', JSON.stringify(mock));
-        }
+        // Load diet requests from API
+        const loadRequests = async () => {
+            try {
+                const data = await dietRequestsApi.getAll();
+                setRequests(data);
+            } catch (error) {
+                console.error('Failed to load diet requests:', error);
+                toast.error('Failed to load diet requests');
+            }
+        };
+
+        loadRequests();
     }, []);
 
-    const handleApprove = (id: string) => {
+    const handleApprove = async (id: string) => {
         const request = requests.find(r => r.id === id);
         if (request) {
-            // Update status to approved
-            setRequests(prev => {
-                const updated = prev.map(r =>
-                    r.id === id ? { ...r, status: 'Diet Order Placed' as const } : r
-                );
-                localStorage.setItem('dietRequests', JSON.stringify(updated));
-                return updated;
-            });
+            try {
+                // Update status to approved
+                await dietRequestsApi.update(id, { status: 'Diet Order Placed' as const });
+                
+                // Refresh requests from API
+                const updatedRequests = await dietRequestsApi.getAll();
+                setRequests(updatedRequests);
 
-            // Navigate to diet order page with patient details
-            navigate('/dietorder', {
-                state: {
-                    patientId: request.patientId,
-                    patientName: request.patientName,
-                    age: request.age,
-                    contactNumber: request.contactNumber,
-                    bed: request.bed,
-                    ward: request.ward,
-                    floor: request.floor,
-                    doctor: request.doctor,
-                    doctorNotes: request.doctorNotes
-                }
-            });
+                // Navigate to diet order page with patient details
+                navigate('/dietorder', {
+                    state: {
+                        patientId: request.patientId,
+                        patientName: request.patientName,
+                        age: request.age,
+                        contactNumber: request.contactNumber,
+                        bed: request.bed,
+                        ward: request.ward,
+                        floor: request.floor,
+                        doctor: request.doctor,
+                        doctorNotes: request.doctorNotes
+                    }
+                });
+                
+                toast.success('Diet request approved successfully!');
+            } catch (error) {
+                console.error('Failed to approve diet request:', error);
+                toast.error('Failed to approve diet request');
+            }
         }
     };
 
@@ -169,7 +139,7 @@ const DietRequestManagement: React.FC<DietRequestManagementProps> = ({ sidebarCo
         }
     };
 
-    const handleAddRequest = (e: React.FormEvent) => {
+    const handleAddRequest = async (e: React.FormEvent) => {
         e.preventDefault();
         
         // Reset previous errors
@@ -198,26 +168,37 @@ const DietRequestManagement: React.FC<DietRequestManagementProps> = ({ sidebarCo
         }
         
         if (hasError) return;
-        const newReq: DietRequest = {
-            id: Date.now().toString(),
-            patientId: newRequest.patientId,
-            patientName: newRequest.patientName,
-            age: newRequest.age,
-            contactNumber: newRequest.contactNumber,
-            bed: newRequest.bed,
-            ward: newRequest.ward,
-            floor: newRequest.floor,
-            doctor: newRequest.doctor,
-            doctorNotes: newRequest.doctorNotes,
-            status: newRequest.status as DietRequest['status'],
-        };
-        const updated = [newReq, ...requests];
-        setRequests(updated);
-        localStorage.setItem('dietRequests', JSON.stringify(updated));
-        setNewRequest({ patientId: '', patientName: '', age: '', contactNumber: '', bed: '', ward: '', floor: '', doctor: '', doctorNotes: '', status: 'Pending', approval: 'Pending' });
         
-        // Navigate to diet request approval page after successful submission
-        navigate('/dietrequestapproval');
+        try {
+            const newReq = {
+                patientId: newRequest.patientId,
+                patientName: newRequest.patientName,
+                age: newRequest.age,
+                contactNumber: newRequest.contactNumber,
+                bed: newRequest.bed,
+                ward: newRequest.ward,
+                floor: newRequest.floor,
+                doctor: newRequest.doctor,
+                doctorNotes: newRequest.doctorNotes,
+                status: newRequest.status as DietRequest['status'],
+            };
+            
+            await dietRequestsApi.create(newReq);
+            
+            // Refresh requests from API
+            const updatedRequests = await dietRequestsApi.getAll();
+            setRequests(updatedRequests);
+            
+            setNewRequest({ patientId: '', patientName: '', age: '', contactNumber: '', bed: '', ward: '', floor: '', doctor: '', doctorNotes: '', status: 'Pending', approval: 'Pending' });
+            
+            toast.success('Diet request created successfully!');
+            
+            // Navigate to diet request approval page after successful submission
+            navigate('/dietrequestapproval');
+        } catch (error) {
+            console.error('Failed to create diet request:', error);
+            toast.error('Failed to create diet request');
+        }
     };
 
     const handleEdit = (id: string) => {
@@ -227,40 +208,61 @@ const DietRequestManagement: React.FC<DietRequestManagementProps> = ({ sidebarCo
             setEditRequest({ ...req, approval: req.status === 'Diet Order Placed' ? 'Approved' : req.status });
         }
     };
-    const handleEditSave = () => {
+    const handleEditSave = async () => {
         if (!editId || !editRequest) return;
-        setRequests(prev => {
-            const updated = prev.map(r =>
-                r.id === editId
-                    ? { ...r, ...editRequest, status: editRequest.status as DietRequest['status'] }
-                    : r
-            );
-            localStorage.setItem('dietRequests', JSON.stringify(updated));
-            return updated;
-        });
-        setEditId(null);
-        setEditRequest(null);
+        
+        try {
+            await dietRequestsApi.update(editId, {
+                ...editRequest,
+                status: editRequest.status as DietRequest['status']
+            });
+            
+            // Refresh requests from API
+            const updatedRequests = await dietRequestsApi.getAll();
+            setRequests(updatedRequests);
+            
+            setEditId(null);
+            setEditRequest(null);
+            toast.success('Diet request updated successfully!');
+        } catch (error) {
+            console.error('Failed to update diet request:', error);
+            toast.error('Failed to update diet request');
+        }
     };
     const handleEditCancel = () => {
         setEditId(null);
         setEditRequest(null);
     };
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (!window.confirm('Delete this request?')) return;
-        setRequests(prev => {
-            const updated = prev.filter(r => r.id !== id);
-            localStorage.setItem('dietRequests', JSON.stringify(updated));
-            return updated;
-        });
+        
+        try {
+            await dietRequestsApi.delete(id);
+            
+            // Refresh requests from API
+            const updatedRequests = await dietRequestsApi.getAll();
+            setRequests(updatedRequests);
+            
+            toast.success('Diet request deleted successfully!');
+        } catch (error) {
+            console.error('Failed to delete diet request:', error);
+            toast.error('Failed to delete diet request');
+        }
     };
-    const handleReject = (id: string) => {
-        setRequests(prev => {
-            const updated = prev.map(req =>
-                req.id === id ? { ...req, status: 'Rejected' as 'Rejected' } : req
-            );
-            localStorage.setItem('dietRequests', JSON.stringify(updated));
-            return updated;
-        });
+    
+    const handleReject = async (id: string) => {
+        try {
+            await dietRequestsApi.update(id, { status: 'Rejected' as 'Rejected' });
+            
+            // Refresh requests from API
+            const updatedRequests = await dietRequestsApi.getAll();
+            setRequests(updatedRequests);
+            
+            toast.success('Diet request rejected successfully!');
+        } catch (error) {
+            console.error('Failed to reject diet request:', error);
+            toast.error('Failed to reject diet request');
+        }
     };
 
     return (

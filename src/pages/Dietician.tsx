@@ -23,60 +23,16 @@ import { FaSearch } from 'react-icons/fa';
 import { AiOutlinePlus } from 'react-icons/ai';
 import { useFood } from '../context/FoodContext';
 import AddressInput from "../components/Addressinput";
-import type row from "antd/es/row";
+import { dietOrdersApi, dietPackagesApi, canteenOrdersApi } from '../services/api';
+import type { DietOrder, DietPackage } from '../services/api';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 // import { foodItemApi } from "../api/foodItemApi";
 // import type { FoodItem } from "../types/foodItem";
 
 
 type Status = "active" | "paused" | "stopped";
 type ApprovalStatus = "pending" | "approved" | "rejected";
-
-
-interface MealItem {
-  foodItemId: string;
-  foodItemName: string;
-  quantity: number;
-  unit: string;
-}
-
-
-interface DietPackage {
-  id: string;
-  name: string;
-  type: string;
-  breakfast: MealItem[];
-  brunch: MealItem[];
-  lunch: MealItem[];
-  dinner: MealItem[];
-  evening: MealItem[];
-  totalRate: number;
-  totalNutrition: {
-    calories: number;
-    protein: number;
-    carbohydrates: number;
-    fat: number;
-  };
-}
-
-
-interface DietOrder {
-  id: string;
-  patientName: string;
-  patientId: string;
-  contactNumber?: string; // Added
-  bed: string;
-  ward: string;
-  dietPackage: string; // This is the package ID
-  packageName?: string; // This will store the package name for display
-  startDate: string;
-  endDate?: string;
-  doctorNotes: string;
-  status: Status;
-  approvalStatus: ApprovalStatus;
-  dieticianInstructions?: string;
-  pauseDate?: string;
-  restartDate?: string;
-}
 
 
 interface DieticianInterface {
@@ -136,28 +92,29 @@ const DieticianInterface: React.FC<DieticianInterface> = ({ sidebarCollapsed, to
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
   };
-  // Load orders and packages from localStorage on component mount
+  // Load orders and packages from API on component mount
   useEffect(() => {
-    try {
-      // Load orders
-      const savedOrders = localStorage.getItem('dietOrders');
-      if (savedOrders) {
-        const parsedOrders = JSON.parse(savedOrders);
-        setPendingOrders(parsedOrders);
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Load orders and packages in parallel
+        const [orders, packages] = await Promise.all([
+          dietOrdersApi.getAll(),
+          dietPackagesApi.getAll()
+        ]);
+        
+        setPendingOrders(orders);
+        setDietPackages(packages);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        toast.error('Failed to load data');
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-
-      // Load diet packages
-      const savedPackages = localStorage.getItem('dietPackages');
-      if (savedPackages) {
-        const parsedPackages = JSON.parse(savedPackages);
-        setDietPackages(parsedPackages);
-      }
-    } catch (error) {
-      console.error('Failed to load data:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    loadData();
   }, []);
 
 
@@ -190,13 +147,10 @@ const DieticianInterface: React.FC<DieticianInterface> = ({ sidebarCollapsed, to
 //   }, [customPlanMeals, foodItems]);
 
 
-  const updateOrders = (updatedOrders: DietOrder[]) => {
+  const updateOrders = async (updatedOrders: DietOrder[]) => {
     setPendingOrders(updatedOrders);
-    try {
-      localStorage.setItem('dietOrders', JSON.stringify(updatedOrders));
-    } catch (error) {
-      console.error('Failed to save orders:', error);
-    }
+    // Note: We don't need to save to localStorage anymore since we're using the API
+    // The API calls will handle persistence
   };
 
 
@@ -216,9 +170,33 @@ const DieticianInterface: React.FC<DieticianInterface> = ({ sidebarCollapsed, to
   const handlePackageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newPackageId = e.target.value;
     setEditingPackageId(newPackageId);
-    const newPackage = dietPackages.find(pkg => pkg.id === newPackageId);
-    if (newPackage) {
-      setSelectedPackage(newPackage);
+    
+    // Check if it's a custom package
+    if (newPackageId.startsWith('custom-')) {
+      const planId = newPackageId.replace('custom-', '');
+      const plan = customPlans.find(p => p.id.toString() === planId);
+      if (plan) {
+        // Create a mock package structure for custom plans
+        const customPackage = {
+          id: newPackageId,
+          name: plan.packageName,
+          type: plan.dietType,
+          breakfast: plan.meals.breakfast || [],
+          brunch: plan.meals.brunch || [],
+          lunch: plan.meals.lunch || [],
+          evening: plan.meals.evening || [],
+          dinner: plan.meals.dinner || [],
+          totalRate: plan.amount,
+          totalNutrition: { calories: 0, protein: 0, carbohydrates: 0, fat: 0 }
+        };
+        setSelectedPackage(customPackage as any);
+      }
+    } else {
+      // Regular package
+      const newPackage = dietPackages.find(pkg => pkg.id === newPackageId);
+      if (newPackage) {
+        setSelectedPackage(newPackage);
+      }
     }
   };
 
@@ -237,33 +215,46 @@ const DieticianInterface: React.FC<DieticianInterface> = ({ sidebarCollapsed, to
   };
 
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     if (selectedOrder) {
-      const updatedOrder = {
-        ...selectedOrder,
-        dietPackage: editingPackageId,
-        packageName: dietPackages.find(pkg => pkg.id === editingPackageId)?.name || ''
-      };
-     
-      const updatedOrders = pendingOrders.map(order =>
-        order.id === selectedOrder.id ? updatedOrder : order
-      );
-     
-      setPendingOrders(updatedOrders);
-      setSelectedOrder(updatedOrder);
-      localStorage.setItem('dietOrders', JSON.stringify(updatedOrders));
-      setIsEditing(false);
-      showNotification('Diet package updated successfully!', 'success');
-      setSelectedOrder(null); // Close the review order page after saving
+      try {
+        let packageName = '';
+        if (editingPackageId.startsWith('custom-')) {
+          const planId = editingPackageId.replace('custom-', '');
+          const plan = customPlans.find(p => p.id.toString() === planId);
+          packageName = plan ? plan.packageName : '';
+        } else {
+          const selectedPkg = dietPackages.find(pkg => pkg.id === editingPackageId);
+          packageName = selectedPkg?.name || '';
+        }
+        
+        const updatedOrder = {
+          ...selectedOrder,
+          dietPackage: editingPackageId,
+          packageName: packageName
+        };
+       
+        await dietOrdersApi.update(selectedOrder.id, updatedOrder);
+        
+        // Refresh orders from API
+        const updatedOrders = await dietOrdersApi.getAll();
+        setPendingOrders(updatedOrders);
+        setSelectedOrder(updatedOrder);
+        setIsEditing(false);
+        toast.info('Diet package updated successfully!');
+        setSelectedOrder(null); // Close the review order page after saving
+      } catch (error) {
+        console.error('Failed to update diet order:', error);
+        toast.error('Failed to update diet order');
+      }
     }
   };
 
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
     try {
       const orderToApprove = pendingOrders.find(order => order.id === id);
       if (!orderToApprove) return;
-
 
       const approvedOrder = {
         ...orderToApprove,
@@ -272,90 +263,128 @@ const DieticianInterface: React.FC<DieticianInterface> = ({ sidebarCollapsed, to
         status: "active" as const
       };
      
-      // Get current canteen orders
-      const existingCanteenOrders = JSON.parse(localStorage.getItem('canteenOrders') || '[]');
+      // Update the order in the API
+      await dietOrdersApi.update(id, approvedOrder);
+     
+      // Get current canteen orders from API
+      const existingCanteenOrders = await canteenOrdersApi.getAll();
      
       // Check if order already exists in canteen orders
       const orderIndex = existingCanteenOrders.findIndex((o: any) => o.id === id);
      
       // Always fetch the correct package for this order
-      const pkg = dietPackages.find(p => p.id === approvedOrder.dietPackage);
-      const pkgName = pkg?.name;
-      const canteenOrder = {
+      let pkgName = 'N/A';
+      let dietType = 'N/A';
+      let foodItems: string[] = [];
+      
+      if (approvedOrder.dietPackage.startsWith('custom-')) {
+        const planId = approvedOrder.dietPackage.replace('custom-', '');
+        const plan = customPlans.find(p => p.id.toString() === planId);
+        if (plan) {
+          pkgName = plan.packageName;
+          dietType = plan.dietType;
+          // Convert custom plan meals to food items
+          Object.values(plan.meals).forEach((mealArr: any) => {
+            mealArr.forEach((item: any) => {
+              foodItems.push(`${item.foodItemName} - ${item.quantity} ${item.unit}`);
+            });
+          });
+        }
+      } else {
+        const pkg = dietPackages.find(p => p.id === approvedOrder.dietPackage);
+        pkgName = pkg?.name || 'N/A';
+        dietType = pkg?.type || 'N/A';
+        foodItems = pkg ? Object.values(pkg).filter(Array.isArray).flat().map(item => `${item.foodItemName} - ${item.quantity} ${item.unit}`) : [];
+      }
+      
+      // Update the order with the package name
+      const updatedOrder = {
         ...approvedOrder,
-        dietPackageName: pkgName || 'N/A',
+        packageName: pkgName
+      };
+      
+      // Update the order in the API
+      await dietOrdersApi.update(id, updatedOrder);
+      
+      const canteenOrder = {
+        id: approvedOrder.id,
+        patientName: approvedOrder.patientName,
+        bed: approvedOrder.bed,
+        ward: approvedOrder.ward,
+        dietPackageName: pkgName,
+        dietType: dietType,
+        foodItems: foodItems,
+        specialNotes: approvedOrder.dieticianInstructions || '',
+        status: 'pending' as const,
         prepared: false,
         delivered: false,
-        mealItems: pkg ? {
-          breakfast: pkg.breakfast || [],
-          brunch: pkg.brunch || [],
-          lunch: pkg.lunch || [],
-          evening: pkg.evening || [],
-          dinner: pkg.dinner || []
-        } : {}
+        dieticianInstructions: approvedOrder.dieticianInstructions
       };
 
-
       // Update or add the order to canteen orders
-      let updatedCanteenOrders;
       if (orderIndex >= 0) {
-        updatedCanteenOrders = [...existingCanteenOrders];
-        updatedCanteenOrders[orderIndex] = canteenOrder;
+        await canteenOrdersApi.update(id, canteenOrder);
       } else {
-        updatedCanteenOrders = [...existingCanteenOrders, canteenOrder];
+        await canteenOrdersApi.create(canteenOrder);
       }
      
-      // Save to localStorage
-      localStorage.setItem('canteenOrders', JSON.stringify(updatedCanteenOrders));
-     
-      // Update the orders list
-      const updatedOrders = pendingOrders.map(order =>
-        order.id === id ? approvedOrder : order
-      );
-     
-      updateOrders(updatedOrders);
+      // Refresh orders from API
+      const updatedOrders = await dietOrdersApi.getAll();
+      setPendingOrders(updatedOrders);
       setSelectedOrder(null);
       setInstructions("");
      
       // Show success notification
-      showNotification('Order approved and sent to canteen!', 'success');
+      toast.success('Order approved and sent to canteen!');
      
       // Trigger custom event to notify canteen interface
       window.dispatchEvent(new Event('canteenOrdersUpdated'));
      
     } catch (error) {
       console.error('Error approving order:', error);
-      showNotification('Failed to approve order. Please try again.', 'error');
+      toast.error('Failed to approve order. Please try again.');
     }
   };
 
 
-  const handleReject = (id: string) => {
-    const updatedOrders = pendingOrders.map(order => {
-      if (order.id === id) {
-        return {
-          ...order,
-          approvalStatus: "rejected" as const,
-          dieticianInstructions: instructions,
-          status: "stopped" as const
-        };
-      }
-      return order;
-    });
-    updateOrders(updatedOrders);
-    setSelectedOrder(null);
-    setInstructions("");
+  const handleReject = async (id: string) => {
+    try {
+      const rejectedOrder = {
+        approvalStatus: "rejected" as const,
+        dieticianInstructions: instructions,
+        status: "stopped" as const
+      };
+      
+      await dietOrdersApi.update(id, rejectedOrder);
+      
+      // Refresh orders from API
+      const updatedOrders = await dietOrdersApi.getAll();
+      setPendingOrders(updatedOrders);
+      setSelectedOrder(null);
+      setInstructions("");
+      toast.error('Order rejected successfully');
+    } catch (error) {
+      console.error('Failed to reject order:', error);
+      toast.error('Failed to reject order');
+    }
   };
 
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this order?')) {
-      const updatedOrders = pendingOrders.filter(order => order.id !== id);
-      setPendingOrders(updatedOrders);
-      localStorage.setItem('dietOrders', JSON.stringify(updatedOrders));
-      setSelectedOrder(null);
-      setInstructions("");
-      showNotification('Order deleted successfully', 'success');
+      try {
+        await dietOrdersApi.delete(id);
+        
+        // Refresh orders from API
+        const updatedOrders = await dietOrdersApi.getAll();
+        setPendingOrders(updatedOrders);
+        setSelectedOrder(null);
+        setInstructions("");
+        toast.error('Order deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete order:', error);
+        toast.error('Failed to delete order');
+      }
     }
   };
 
@@ -374,36 +403,41 @@ const DieticianInterface: React.FC<DieticianInterface> = ({ sidebarCollapsed, to
   };
 
 
-  const handlePause = (id: string) => {
-    const now = new Date().toISOString();
-    const updatedOrders = pendingOrders.map(order => {
-      if (order.id === id) {
-        return {
-          ...order,
-          status: 'paused' as const,
-          pauseDate: now
-        };
-      }
-      return order;
-    });
-    updateOrders(updatedOrders);
+  const handlePause = async (id: string) => {
+    try {
+      const now = new Date().toISOString();
+      await dietOrdersApi.update(id, {
+        status: 'paused' as const,
+        pauseDate: now
+      });
+      
+      // Refresh orders from API
+      const updatedOrders = await dietOrdersApi.getAll();
+      setPendingOrders(updatedOrders);
+      toast.error('Order paused successfully');
+    } catch (error) {
+      console.error('Failed to pause order:', error);
+      toast.error('Failed to pause order');
+    }
   };
 
 
-  const handleRestart = (id: string) => {
-    const now = new Date().toISOString();
-    const updatedOrders = pendingOrders.map(order => {
-      if (order.id === id) {
-        return {
-          ...order,
-          status: 'active' as const,
-          restartDate: now
-        };
-      }
-      return order;
-    });
-    updateOrders(updatedOrders);
-    showNotification('Diet order restarted!', 'success');
+  const handleRestart = async (id: string) => {
+    try {
+      const now = new Date().toISOString();
+      await dietOrdersApi.update(id, {
+        status: 'active' as const,
+        restartDate: now
+      });
+      
+      // Refresh orders from API
+      const updatedOrders = await dietOrdersApi.getAll();
+      setPendingOrders(updatedOrders);
+      toast.success('Diet order restarted!');
+    } catch (error) {
+      console.error('Failed to restart order:', error);
+      toast.error('Failed to restart order');
+    }
   };
 
 
@@ -439,41 +473,55 @@ const DieticianInterface: React.FC<DieticianInterface> = ({ sidebarCollapsed, to
     const { name, value } = e.target;
     setCustomDietForm(prev => ({ ...prev, [name]: value }));
   };
-  const handleCustomDietSubmit = (e: React.FormEvent) => {
+  const handleCustomDietSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customDietForm.patientName || !customDietForm.dietPackage || !customDietForm.startDate) {
-      showNotification('Please fill all required fields', 'error');
+      toast.error('Please fill all required fields');
       return;
     }
-    const pkg = dietPackages.find(p => p.id === customDietForm.dietPackage);
-    const newOrder = {
-      id: Date.now().toString(),
-      patientName: customDietForm.patientName,
-      patientId: '',
-      bed: '',
-      ward: '',
-      dietPackage: customDietForm.dietPackage,
-      packageName: pkg ? pkg.name : '',
-      startDate: customDietForm.startDate,
-      endDate: customDietForm.endDate,
-      doctorNotes: '',
-      status: customDietForm.status as Status,
-      approvalStatus: customDietForm.approvalStatus as ApprovalStatus,
-      dieticianInstructions: '',
-    };
-    const updatedOrders = [...pendingOrders, newOrder];
-    updateOrders(updatedOrders);
-    setShowCustomDietForm(false);
-    setCustomDietForm({
-      patientName: '',
-      dietPackage: '',
-      rate: '',
-      startDate: new Date().toISOString().slice(0, 10),
-      endDate: '',
-      status: 'active',
-      approvalStatus: 'pending',
-    });
-    showNotification('Custom diet order added!', 'success');
+    
+    try {
+      const pkg = dietPackages.find(p => p.id === customDietForm.dietPackage);
+      const newOrder = {
+        patientName: customDietForm.patientName,
+        patientId: '',
+        contactNumber: '',
+        age: '',
+        bed: '',
+        ward: '',
+        floor: '',
+        dietPackage: customDietForm.dietPackage,
+        packageName: pkg ? pkg.name : '',
+        packageRate: '',
+        startDate: customDietForm.startDate,
+        endDate: customDietForm.endDate,
+        doctorNotes: '',
+        status: customDietForm.status as Status,
+        approvalStatus: customDietForm.approvalStatus as ApprovalStatus,
+        dieticianInstructions: '',
+      };
+      
+      await dietOrdersApi.create(newOrder);
+      
+      // Refresh orders from API
+      const updatedOrders = await dietOrdersApi.getAll();
+      setPendingOrders(updatedOrders);
+      
+      setShowCustomDietForm(false);
+      setCustomDietForm({
+        patientName: '',
+        dietPackage: '',
+        rate: '',
+        startDate: new Date().toISOString().slice(0, 10),
+        endDate: '',
+        status: 'active',
+        approvalStatus: 'pending',
+      });
+      toast.success('Custom diet order added!');
+    } catch (error) {
+      console.error('Failed to create custom diet order:', error);
+      toast.error('Failed to create custom diet order');
+    }
   };
 
 
@@ -791,7 +839,23 @@ const DieticianInterface: React.FC<DieticianInterface> = ({ sidebarCollapsed, to
             { 
               key: 'packageName', 
               header: 'Diet Package', 
-              render: (_: any, row: any) => row.packageName || 'N/A' 
+              render: (_: any, row: any) => {
+                if (row.packageName) {
+                  return row.packageName;
+                }
+                if (row.dietPackage) {
+                  // Check if it's a custom package
+                  if (row.dietPackage.startsWith('custom-')) {
+                    const planId = row.dietPackage.replace('custom-', '');
+                    const plan = customPlans.find(p => p.id.toString() === planId);
+                    return plan ? plan.packageName : 'N/A';
+                  }
+                  // Regular package
+                  const pkg = dietPackages.find(p => p.id === row.dietPackage);
+                  return pkg ? pkg.name : 'N/A';
+                }
+                return 'N/A';
+              }
             },
             { 
               key: 'startDate', 
@@ -944,7 +1008,10 @@ const DieticianInterface: React.FC<DieticianInterface> = ({ sidebarCollapsed, to
                   name="dietPackage"
                   value={isEditing ? editingPackageId : selectedPackage?.name || ''}
                   onChange={handlePackageChange}
-                  options={dietPackages.map(pkg => ({ value: pkg.id, label: `${pkg.name} (${pkg.type})` }))}
+                  options={[
+                    ...dietPackages.map(pkg => ({ value: pkg.id, label: `${pkg.name} (${pkg.type})` })),
+                    ...customPlans.map(plan => ({ value: `custom-${plan.id}`, label: `Custom: ${plan.packageName} (${plan.dietType})` }))
+                  ]}
                 />
               </div>
               <div style={{ flex: 1 }}>

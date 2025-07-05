@@ -1,0 +1,180 @@
+{
+  "dietOrders": [
+    {
+      "id": "1751724091019",
+      "patientName": "kesavan",
+      "patientId": "P003",
+      "contactNumber": "8907890789",
+      "age": "55",
+      "bed": "1",
+      "ward": "1",
+      "floor": "1",
+      "dietPackage": "1751724027513",
+      "packageRate": "70",
+      "startDate": "2025-07-05",
+      "endDate": "2025-07-31",
+      "doctorNotes": "",
+      "status": "active",
+      "approvalStatus": "approved",
+      "dieticianInstructions": "",
+      "packageName": "General"
+    },
+    {
+      "id": "1751729967836",
+      "patientName": "Gopika",
+      "patientId": "",
+      "contactNumber": "",
+      "age": "",
+      "bed": "",
+      "ward": "",
+      "floor": "",
+      "dietPackage": "1751724027513",
+      "packageName": "General",
+      "packageRate": "",
+      "startDate": "2025-07-05",
+      "endDate": "2025-07-29",
+      "doctorNotes": "",
+      "status": "active",
+      "approvalStatus": "approved",
+      "dieticianInstructions": ""
+    },
+    {
+      "id": "1751730329572",
+      "patientName": "gokul",
+      "patientId": "",
+      "contactNumber": "",
+      "age": "",
+      "bed": "",
+      "ward": "",
+      "floor": "",
+      "dietPackage": "custom-1751729833661",
+      "packageName": "",
+      "packageRate": "",
+      "startDate": "2025-07-05",
+      "endDate": "2025-07-30",
+      "doctorNotes": "",
+      "status": "active",
+      "approvalStatus": "pending",
+      "dieticianInstructions": ""
+    }
+  ],
+  "dietPackages": [
+    {
+      "id": "1751724027513",
+      "name": "General",
+      "type": "regular",
+      "breakfast": [
+        {
+          "foodItemId": "e0bc",
+          "foodItemName": "Apple ",
+          "quantity": 1,
+          "unit": "Piece",
+          "time": "09:00",
+          "period": "AM"
+        }
+      ],
+      "brunch": [],
+      "lunch": [
+        {
+          "foodItemId": "a41f",
+          "foodItemName": "salad",
+          "quantity": 1,
+          "unit": "Cup",
+          "time": "01:00",
+          "period": "PM"
+        }
+      ],
+      "dinner": [],
+      "evening": [],
+      "totalRate": 70,
+      "totalNutrition": {
+        "calories": 15,
+        "protein": 17,
+        "carbohydrates": 17,
+        "fat": 16
+      }
+    }
+  ],
+  "dietRequests": [
+    {
+      "id": "1751724061545",
+      "patientId": "P003",
+      "patientName": "kesavan",
+      "age": "55",
+      "contactNumber": "8907890789",
+      "bed": "1",
+      "ward": "1",
+      "floor": "1",
+      "doctor": "josh",
+      "doctorNotes": "",
+      "status": "Diet Order Placed"
+    }
+  ],
+  "foodItems": [
+    {
+      "id": "e0bc",
+      "name": "Apple ",
+      "foodType": "Solid",
+      "category": "Fruits",
+      "unit": "Piece",
+      "quantity": "2",
+      "calories": "12",
+      "protein": "13",
+      "carbohydrates": "12",
+      "fat": "11",
+      "price": "20",
+      "pricePerUnit": "10.00"
+    },
+    {
+      "id": "a41f",
+      "name": "salad",
+      "foodType": "Solid",
+      "category": "Vegetables",
+      "unit": "Cup",
+      "quantity": "5",
+      "calories": "3",
+      "protein": "4",
+      "carbohydrates": "5",
+      "fat": "5",
+      "price": "50",
+      "pricePerUnit": "10.00"
+    }
+  ],
+  "canteenOrders": [
+    {
+      "id": "1751724128000",
+      "patientName": "kesavan",
+      "bed": "1",
+      "ward": "1",
+      "dietPackageName": "General",
+      "dietType": "regular",
+      "foodItems": [
+        "Apple  - 1 Piece",
+        "salad - 1 Cup"
+      ],
+      "specialNotes": "",
+      "status": "delivered",
+      "prepared": false,
+      "delivered": false,
+      "dieticianInstructions": ""
+    },
+    {
+      "id": "1751730338620",
+      "patientName": "Gopika",
+      "bed": "",
+      "ward": "",
+      "dietPackageName": "General",
+      "dietType": "regular",
+      "foodItems": [
+        "Apple  - 1 Piece",
+        "salad - 1 Cup"
+      ],
+      "specialNotes": "",
+      "status": "pending",
+      "prepared": false,
+      "delivered": false,
+      "dieticianInstructions": ""
+    }
+  ],
+  "customPlans": []
+}

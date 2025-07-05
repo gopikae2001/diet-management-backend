@@ -5,54 +5,15 @@ import Footer from "../components/Footer";
 import SectionHeading from "../components/SectionHeading";
 import PageContainer from "../components/PageContainer";
 import FormInputType from "../components/Inputtype";
-
-
-interface FoodItem {
-  name: string;
-  quantity: string;
-}
-
-
-interface MealItemDetail {
-  foodItemName: string;
-  quantity: number;
-  unit: string;
-}
-
-
-interface MealWithStatus {
-  items: MealItemDetail[];
-  status: Status;
-}
-
-
-interface MealItems {
-  breakfast?: MealWithStatus;
-  brunch?: MealWithStatus;
-  lunch?: MealWithStatus;
-  evening?: MealWithStatus;
-  dinner?: MealWithStatus;
-}
+import Table from "../components/Table";
+import DeleteButton from "../components/DeleteButton";
+import { canteenOrdersApi, dietPackagesApi } from '../services/api';
+import type { CanteenOrder, DietPackage } from '../services/api';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 
 type Status = "pending" | "active" | "paused" | "stopped" | "prepared" | "delivered";
-
-
-interface MealOrder {
-  id: string;
-  patientName: string;
-  bed: string;
-  ward: string;
-  dietPackageName?: string;
-  dietType: string;
-  foodItems: FoodItem[];
-  specialNotes: string;
-  status: Status;
-  prepared: boolean;
-  delivered: boolean;
-  dieticianInstructions?: string;
-  mealItems?: MealItems;
-}
 
 
 interface CanteenInterfaceProps {
@@ -63,185 +24,118 @@ interface CanteenInterfaceProps {
 
 const CanteenInterface: React.FC<CanteenInterfaceProps> = ({ sidebarCollapsed, toggleSidebar }) => {
   const [selectedMeal, setSelectedMeal] = useState<string>("breakfast");
-  const [mealOrders, setMealOrders] = useState<MealOrder[]>([]);
+  const [mealOrders, setMealOrders] = useState<CanteenOrder[]>([]);
+  const [dietPackages, setDietPackages] = useState<DietPackage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-
-  const loadOrders = () => {
-    const savedCanteenOrders = localStorage.getItem('canteenOrders');
-    if (savedCanteenOrders) {
-      const parsedOrders: MealOrder[] = JSON.parse(savedCanteenOrders);
-     
-      const transformedOrders = parsedOrders.map(order => {
-        const mealKey = selectedMeal as keyof MealItems;
-        let foodItems: FoodItem[] = [];
-        let mealStatus: Status = 'pending';
-        let mealItems: MealItems = {};
-        if (order.mealItems && order.mealItems[mealKey]) {
-          if ('items' in order.mealItems[mealKey]) {
-            foodItems = (order.mealItems[mealKey] as MealWithStatus).items.map(item => ({
-              name: item.foodItemName,
-              quantity: `${item.quantity} ${item.unit}`
-            }));
-            mealStatus = (order.mealItems[mealKey] as MealWithStatus).status;
-            mealItems = order.mealItems as MealItems;
-          } else {
-            const items = (order.mealItems[mealKey] as MealItemDetail[]);
-            foodItems = items.map(item => ({
-              name: item.foodItemName,
-              quantity: `${item.quantity} ${item.unit}`
-            }));
-            mealStatus = 'pending';
-            mealItems = {
-              ...order.mealItems,
-              [mealKey]: { items, status: 'pending' as Status }
-            };
-          }
-        }
-        return {
-          id: order.id,
-          patientName: order.patientName,
-          bed: order.bed,
-          ward: order.ward,
-          dietPackageName: order.dietPackageName,
-          dietType: order.dietPackageName || 'N/A',
-          foodItems: foodItems,
-          specialNotes: order.dieticianInstructions || '',
-          status: mealStatus,
-          prepared: mealStatus === 'prepared',
-          delivered: mealStatus === 'delivered',
-          dieticianInstructions: order.dieticianInstructions,
-          mealItems: mealItems,
-        };
-      });
-
-
-      setMealOrders(transformedOrders);
+  // Load orders and packages from API
+  const loadOrders = async () => {
+    try {
+      setIsLoading(true);
+      const [orders, packages] = await Promise.all([
+        canteenOrdersApi.getAll(),
+        dietPackagesApi.getAll()
+      ]);
+      setMealOrders(orders);
+      setDietPackages(packages);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setIsLoading(false);
     }
   };
 
 
   useEffect(() => {
     loadOrders();
-   
-    const handleStorageChange = () => {
-      loadOrders();
-    };
-
-
-    window.addEventListener('canteenOrdersUpdated', handleStorageChange);
-   
-    return () => {
-      window.removeEventListener('canteenOrdersUpdated', handleStorageChange);
-    };
   }, [selectedMeal]);
 
 
 
 
-  const updateAndSaveOrders = (updatedOrders: MealOrder[]) => {
-    setMealOrders(updatedOrders);
-    const savedCanteenOrders = localStorage.getItem('canteenOrders');
-    if (savedCanteenOrders) {
-      const originalOrders: MealOrder[] = JSON.parse(savedCanteenOrders);
-      const newOriginalOrders = originalOrders.map(originalOrder => {
-        const updatedOrder = updatedOrders.find(uo => uo.id === originalOrder.id);
-        if (updatedOrder) {
-          const status: Status = (['pending', 'active', 'paused', 'stopped', 'prepared', 'delivered'].includes(updatedOrder.status) ? updatedOrder.status : 'pending') as Status;
-          return {
-            id: originalOrder.id,
-            patientName: originalOrder.patientName,
-            bed: originalOrder.bed,
-            ward: originalOrder.ward,
-            dietPackageName: originalOrder.dietPackageName,
-            dietType: originalOrder.dietType,
-            foodItems: originalOrder.foodItems,
-            specialNotes: originalOrder.specialNotes,
-            status,
-            prepared: updatedOrder.prepared,
-            delivered: updatedOrder.delivered,
-            dieticianInstructions: originalOrder.dieticianInstructions,
-            mealItems: originalOrder.mealItems,
-          };
-        }
-        return originalOrder;
-      });
-      localStorage.setItem('canteenOrders', JSON.stringify(newOriginalOrders));
+  // Update order status in API
+  const updateOrderStatus = async (id: string, status: Status) => {
+    try {
+      const orderToUpdate = mealOrders.find(order => order.id === id);
+      if (!orderToUpdate) return;
+
+      const updatedOrder = {
+        ...orderToUpdate,
+        status: status
+      };
+
+      await canteenOrdersApi.update(id, updatedOrder);
+      await loadOrders(); // Reload orders
+      toast.success(`Order status updated to ${status}`);
+    } catch (error) {
+      console.error('Failed to update order status:', error);
+      toast.error('Failed to update order status');
     }
   };
 
-
   const handleMarkActive = (id: string) => {
-    const updatedOrders = mealOrders.map(order => {
-      if (order.id === id && order.mealItems && order.mealItems[selectedMeal as keyof MealItems]) {
-        return {
-          ...order,
-          mealItems: {
-            ...order.mealItems,
-            [selectedMeal]: {
-              ...order.mealItems[selectedMeal as keyof MealItems],
-              status: 'active' as Status
-            }
-          }
-        };
-      }
-      return order;
-    });
-    updateAndSaveOrders(updatedOrders);
+    updateOrderStatus(id, 'active');
   };
-
 
   const handleMarkPrepared = (id: string) => {
-    const updatedOrders = mealOrders.map(order => {
-      if (order.id === id && order.mealItems && order.mealItems[selectedMeal as keyof MealItems]) {
-        return {
-          ...order,
-          mealItems: {
-            ...order.mealItems,
-            [selectedMeal]: {
-              ...order.mealItems[selectedMeal as keyof MealItems],
-              status: 'prepared' as Status
-            }
-          }
-        };
-      }
-      return order;
-    });
-    updateAndSaveOrders(updatedOrders);
+    updateOrderStatus(id, 'prepared');
   };
-
 
   const handleMarkDelivered = (id: string) => {
-    const updatedOrders = mealOrders.map(order => {
-      if (order.id === id && order.mealItems && order.mealItems[selectedMeal as keyof MealItems]) {
-        return {
-          ...order,
-          mealItems: {
-            ...order.mealItems,
-            [selectedMeal]: {
-              ...order.mealItems[selectedMeal as keyof MealItems],
-              status: 'delivered' as Status
-            }
-          }
-        };
-      }
-      return order;
-    });
-    updateAndSaveOrders(updatedOrders);
+    updateOrderStatus(id, 'delivered');
   };
 
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this order?')) {
+      try {
+        await canteenOrdersApi.delete(id);
+        await loadOrders(); // Reload orders
+        toast.error('Order deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete order:', error);
+        toast.error('Failed to delete order');
+      }
+    }
+  };
 
+  // Get meal-specific food items for an order
+  const getMealSpecificItems = (order: CanteenOrder) => {
+    // Find the diet package for this order
+    const dietPackage = dietPackages.find(pkg => pkg.name === order.dietPackageName);
+    
+    if (dietPackage && dietPackage[selectedMeal as keyof DietPackage]) {
+      const mealItems = dietPackage[selectedMeal as keyof DietPackage] as any[];
+      return mealItems.map(item => `${item.foodItemName} - ${item.quantity} ${item.unit}`);
+    }
+    
+    // Fallback to all food items if no meal-specific data
+    return order.foodItems || [];
+  };
+
+  // Calculate total quantities for the selected meal
   const totalQuantities = mealOrders.reduce((acc, order) => {
-    order.foodItems.forEach(item => {
-      const quantityMatch = item.quantity.match(/^(\d+)/);
-      const quantity = quantityMatch ? parseInt(quantityMatch[1], 10) : 0;
-      if (acc[item.name]) {
-        acc[item.name] += quantity;
-      } else {
-        acc[item.name] = quantity;
+    const mealSpecificItems = getMealSpecificItems(order);
+    
+    mealSpecificItems.forEach(item => {
+      // Parse food item string (format: "Item Name - Quantity Unit")
+      const parts = item.split(' - ');
+      if (parts.length >= 2) {
+        const itemName = parts[0];
+        const quantityPart = parts[1];
+        const quantityMatch = quantityPart.match(/^(\d+)/);
+        const quantity = quantityMatch ? parseInt(quantityMatch[1], 10) : 0;
+        const unit = quantityPart.replace(/^\d+\s*/, '').trim(); // Extract unit
+        
+        if (acc[itemName]) {
+          acc[itemName].quantity += quantity;
+        } else {
+          acc[itemName] = { quantity, unit };
+        }
       }
     });
     return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<string, { quantity: number; unit: string }>);
 
 
   return (
@@ -280,86 +174,84 @@ const CanteenInterface: React.FC<CanteenInterfaceProps> = ({ sidebarCollapsed, t
       </div>
 
 
-      <div className="header">TOTAL QUANTITY SUMMARY - {selectedMeal.toUpperCase()}</div>
+      <div className="header">Total Quantity Summary - {selectedMeal.toUpperCase()}</div>
       <div className="card grid mb-4">
-        {Object.entries(totalQuantities).map(([item, quantity]) => (
+        {Object.entries(totalQuantities).map(([item, itemData]) => (
           <div key={item} className="summary-box">
             <div className="item-name">{item}</div>
-            <div className="item-quantity">{quantity} portion</div>
+            <div className="item-quantity">{itemData.quantity} {itemData.unit}</div>
           </div>
         ))}
       </div>
 
 
-      <div className="header">PATIENT MEAL ORDERS - {selectedMeal.toUpperCase()}</div>
+      <div className="header">Patient Meal Orders - {selectedMeal.toUpperCase()}</div>
       <div className="card">
-        <table className="meal-table">
-          <thead>
-            <tr style={{ backgroundColor: '#038ba4', color: 'white' }}>
-              <th>S.No</th>
-              <th>Patient</th>
-              <th>Bed/Ward</th>
-              <th>Diet Type</th>
-              <th>Food Items</th>
-              <th>Special Notes</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mealOrders.map((order, index) => {
-              const mealStatus = order.mealItems && order.mealItems[selectedMeal as keyof MealItems]?.status || 'pending';
-              return (
-                <tr key={order.id}>
-                  <td>{index + 1}</td>
-                  <td>{order.patientName}</td>
-                  <td>{order.bed} / {order.ward}</td>
-                  <td>{order.dietType}</td>
-                  <td>
-                    <ul>
-                      {order.foodItems.map((item, index) => (
-                        <li key={index}>{item.name} - {item.quantity}</li>
-                      ))}
-                    </ul>
-                  </td>
-                  <td>
-                    {order.specialNotes && (
-                      <span className="badge warning">{order.specialNotes}</span>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`badge status-${mealStatus}`}>{mealStatus.charAt(0).toUpperCase() + mealStatus.slice(1)}</span>
-                  </td>
-                  <td>
-                    <div className="button-group">
-                      <button
-                        className="btn green"
-                        disabled={mealStatus !== 'pending'}
-                        onClick={() => handleMarkActive(order.id)}
-                      >
-                        Active
-                      </button>
-                      <button
-                        className="btn green"
-                        disabled={mealStatus !== 'active'}
-                        onClick={() => handleMarkPrepared(order.id)}
-                      >
-                        Prepared
-                      </button>
-                      <button
-                        className="btn blue"
-                        disabled={mealStatus !== 'prepared'}
-                        onClick={() => handleMarkDelivered(order.id)}
-                      >
-                        Delivered
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
+        {isLoading ? (
+          <div className="loading">Loading orders...</div>
+        ) : (
+          <Table
+            data={mealOrders.map((order, index) => {
+              // Get meal-specific food items
+              const mealSpecificItems = getMealSpecificItems(order);
+              
+              return {
+                ...order,
+                serialNo: index + 1,
+                patientInfo: `${order.patientName}`,
+                bedWard: `${order.bed} / ${order.ward}`,
+                foodItemsList: mealSpecificItems.join(', ') || 'N/A',
+                specialNotesDisplay: order.specialNotes ? (
+                  <span className="badge warning">{order.specialNotes}</span>
+                ) : null,
+                statusDisplay: (
+                  <span className={`badge status-${order.status}`}>
+                    {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                  </span>
+                ),
+                orderStatus: (
+                  <div className="button-group">
+                    <button
+                      className="btn green"
+                      disabled={order.status !== 'pending'}
+                      onClick={() => handleMarkActive(order.id)}
+                    >
+                      Active
+                    </button>
+                    <button
+                      className="btn green"
+                      disabled={order.status !== 'active'}
+                      onClick={() => handleMarkPrepared(order.id)}
+                    >
+                      Prepared
+                    </button>
+                    <button
+                      className="btn blue"
+                      disabled={order.status !== 'prepared'}
+                      onClick={() => handleMarkDelivered(order.id)}
+                    >
+                      Delivered
+                    </button>
+                  </div>
+                ),
+                action: (
+                  <DeleteButton onClick={() => handleDelete(order.id)} />
+                )
+              };
             })}
-          </tbody>
-        </table>
+            columns={[
+              { key: 'serialNo', header: 'S.No' },
+              { key: 'patientInfo', header: 'Patient' },
+              { key: 'bedWard', header: 'Bed/Ward' },
+              { key: 'dietType', header: 'Diet Type' },
+              { key: 'foodItemsList', header: 'Food Items' },
+              { key: 'specialNotesDisplay', header: 'Special Notes' },
+              { key: 'statusDisplay', header: 'Status' },
+              { key: 'orderStatus', header: 'Order Status' },
+              { key: 'action', header: 'Action' }
+            ]}
+          />
+        )}
       </div>
     {/* </div> */}
     </PageContainer>
