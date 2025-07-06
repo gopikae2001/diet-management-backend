@@ -48,14 +48,31 @@
       "ward": "",
       "floor": "",
       "dietPackage": "custom-1751729833661",
-      "packageName": "",
+      "packageName": "hh",
       "packageRate": "",
       "startDate": "2025-07-05",
       "endDate": "2025-07-30",
       "doctorNotes": "",
       "status": "active",
-      "approvalStatus": "pending",
+      "approvalStatus": "approved",
       "dieticianInstructions": ""
+    },
+    {
+      "id": "1751742685937",
+      "patientName": "Gokul",
+      "patientId": "PID5938072422",
+      "contactNumber": "9879876890",
+      "age": "",
+      "bed": "",
+      "ward": "",
+      "floor": "",
+      "dietPackage": "1751724027513",
+      "packageRate": "70",
+      "startDate": "2025-07-05",
+      "endDate": "2025-07-29",
+      "doctorNotes": "",
+      "status": "active",
+      "approvalStatus": "pending"
     }
   ],
   "dietPackages": [
@@ -108,6 +125,19 @@
       "doctor": "josh",
       "doctorNotes": "",
       "status": "Diet Order Placed"
+    },
+    {
+      "id": "1751742138987",
+      "patientId": "45",
+      "patientName": "Fgg",
+      "age": "",
+      "contactNumber": "8599665854",
+      "bed": "",
+      "ward": "",
+      "floor": "",
+      "doctor": "",
+      "doctorNotes": "",
+      "status": "Pending"
     }
   ],
   "foodItems": [
@@ -138,6 +168,20 @@
       "fat": "5",
       "price": "50",
       "pricePerUnit": "10.00"
+    },
+    {
+      "id": "ad49",
+      "name": "Saas",
+      "foodType": "Solid",
+      "category": "Legumes & Pulses",
+      "unit": "Bowl",
+      "quantity": "1",
+      "calories": "3",
+      "protein": "3",
+      "carbohydrates": "2",
+      "fat": "2",
+      "price": "50",
+      "pricePerUnit": "50.00"
     }
   ],
   "canteenOrders": [
@@ -168,6 +212,22 @@
       "foodItems": [
         "Apple  - 1 Piece",
         "salad - 1 Cup"
+      ],
+      "specialNotes": "",
+      "status": "pending",
+      "prepared": false,
+      "delivered": false,
+      "dieticianInstructions": ""
+    },
+    {
+      "id": "1751779504587",
+      "patientName": "gokul",
+      "bed": "",
+      "ward": "",
+      "dietPackageName": "hh",
+      "dietType": "specialized",
+      "foodItems": [
+        "Apple  - 1 Piece"
       ],
       "specialNotes": "",
       "status": "pending",
