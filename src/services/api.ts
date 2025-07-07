@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://192.168.29.181:3001';
+
+const API_BASE_URL = 'http://192.168.50.90:3001';
+
 
 export interface DietOrder {
   id: string;

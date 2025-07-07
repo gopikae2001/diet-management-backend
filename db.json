@@ -66,13 +66,15 @@
       "bed": "",
       "ward": "",
       "floor": "",
-      "dietPackage": "1751724027513",
+      "dietPackage": "1751889270121",
       "packageRate": "70",
       "startDate": "2025-07-05",
       "endDate": "2025-07-29",
       "doctorNotes": "",
       "status": "active",
-      "approvalStatus": "pending"
+      "approvalStatus": "approved",
+      "packageName": "fd",
+      "dieticianInstructions": ""
     }
   ],
   "dietPackages": [
@@ -109,6 +111,67 @@
         "protein": 17,
         "carbohydrates": 17,
         "fat": 16
+      }
+    },
+    {
+      "id": "1751889270121",
+      "name": "fd",
+      "type": "regular",
+      "breakfast": [
+        {
+          "foodItemId": "e0bc",
+          "foodItemName": "Apple ",
+          "quantity": 1,
+          "unit": "Piece",
+          "time": "09:00",
+          "period": "AM"
+        }
+      ],
+      "brunch": [],
+      "lunch": [
+        {
+          "foodItemId": "922b",
+          "foodItemName": "RICE",
+          "quantity": 1,
+          "unit": "Plate",
+          "time": "01:01",
+          "period": "AM"
+        }
+      ],
+      "dinner": [],
+      "evening": [],
+      "totalRate": 60,
+      "totalNutrition": {
+        "calories": 14,
+        "protein": 17,
+        "carbohydrates": 15,
+        "fat": 19
+      }
+    },
+    {
+      "id": "1751889558425",
+      "name": "aswin",
+      "type": "therapeutic",
+      "breakfast": [
+        {
+          "foodItemId": "a41f",
+          "foodItemName": "salad",
+          "quantity": 1,
+          "unit": "Cup",
+          "time": "14:48",
+          "period": "PM"
+        }
+      ],
+      "brunch": [],
+      "lunch": [],
+      "dinner": [],
+      "evening": [],
+      "totalRate": 50,
+      "totalNutrition": {
+        "calories": 3,
+        "protein": 4,
+        "carbohydrates": 5,
+        "fat": 5
       }
     }
   ],
@@ -182,6 +245,48 @@
       "fat": "2",
       "price": "50",
       "pricePerUnit": "50.00"
+    },
+    {
+      "id": "922b",
+      "name": "RICE",
+      "foodType": "Solid",
+      "category": "Grains",
+      "unit": "Plate",
+      "quantity": "1",
+      "calories": "2",
+      "protein": "4",
+      "carbohydrates": "3",
+      "fat": "8",
+      "price": "40",
+      "pricePerUnit": "40.00"
+    },
+    {
+      "id": "aa97",
+      "name": "gfh",
+      "foodType": "Solid",
+      "category": "Grains",
+      "unit": "Litre",
+      "quantity": "5",
+      "calories": "8",
+      "protein": "7",
+      "carbohydrates": "5",
+      "fat": "5",
+      "price": "40",
+      "pricePerUnit": "8.00"
+    },
+    {
+      "id": "e51b",
+      "name": "Admin",
+      "foodType": "Semi-Solid",
+      "category": "Meat",
+      "unit": "Litre",
+      "quantity": "3",
+      "calories": "45",
+      "protein": "45",
+      "carbohydrates": "11",
+      "fat": "12",
+      "price": "50",
+      "pricePerUnit": "16.67"
     }
   ],
   "canteenOrders": [
@@ -231,6 +336,23 @@
       ],
       "specialNotes": "",
       "status": "pending",
+      "prepared": false,
+      "delivered": false,
+      "dieticianInstructions": ""
+    },
+    {
+      "id": "1751891315890",
+      "patientName": "Gokul",
+      "bed": "",
+      "ward": "",
+      "dietPackageName": "fd",
+      "dietType": "regular",
+      "foodItems": [
+        "Apple  - 1 Piece",
+        "RICE - 1 Plate"
+      ],
+      "specialNotes": "",
+      "status": "active",
       "prepared": false,
       "delivered": false,
       "dieticianInstructions": ""

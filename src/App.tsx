@@ -32,6 +32,7 @@ const App: React.FC = () => {
             <SideBar collapsed={sidebarCollapsed}/>
             <div style={{ flex: 1, padding: '10px', overflowY: 'auto' }}>
               <Routes>
+                <Route path="/" element={<Dashboard sidebarCollapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />} />
                 <Route path="/dashboard" element={<Dashboard sidebarCollapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />} />
                 <Route path="/food-item" element={<FoodItemForm sidebarCollapsed={sidebarCollapsed} toggleSidebar={toggleSidebar}/>} />
                 <Route path="/food-item/:id" element={<FoodItemForm sidebarCollapsed={sidebarCollapsed} toggleSidebar={toggleSidebar}/>} />
